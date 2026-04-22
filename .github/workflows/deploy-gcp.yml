@@ -26,6 +26,27 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check required GCP auth secrets
+        env:
+          WIF: ${{ secrets.WIF_PROVIDER }}
+          SA: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+        run: |
+          missing=0
+          if [ -z "$WIF" ]; then
+            echo "::error::Missing secret WIF_PROVIDER. In this repo: Settings → Secrets and variables → Actions → New repository secret."
+            echo "Value: run in terraform/gcp — terraform output -raw wif_provider"
+            missing=1
+          fi
+          if [ -z "$SA" ]; then
+            echo "::error::Missing secret GCP_SERVICE_ACCOUNT."
+            echo "Value: terraform output -raw app_deployer_service_account"
+            missing=1
+          fi
+          if [ "$missing" -ne 0 ]; then
+            echo "See also: terraform/gcp/README.md → GitHub Actions"
+            exit 1
+          fi
+
       - name: Auth to Google Cloud (Workload Identity Federation)
         id: auth
         uses: google-github-actions/auth@v2
