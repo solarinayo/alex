@@ -91,11 +91,19 @@ async def general_exception_handler(request: Request, exc: Exception):
         content={"detail": "An unexpected error occurred. Our team has been notified."}
     )
 
-# Initialize services
-db = Database()
+# Initialize services — on GCP Cloud Run, AURORA_* is absent until you wire Cloud SQL; do not block startup
+db: Optional[Database] = None
+try:
+    db = Database()
+except Exception as e:
+    logger.warning(
+        "Database not initialized (Aurora Data API / AURORA_* not configured; "
+        "expected on Cloud Run until Cloud SQL is wired). Health still works. Error: %s",
+        e,
+    )
 
 # SQS client for job queueing
-sqs_client = boto3.client('sqs', region_name=os.getenv('DEFAULT_AWS_REGION', 'us-east-1'))
+sqs_client = boto3.client("sqs", region_name=os.getenv("DEFAULT_AWS_REGION", "us-east-1"))
 SQS_QUEUE_URL = os.getenv('SQS_QUEUE_URL', '')
 
 # Clerk authentication setup (exactly like saas reference)

@@ -15,5 +15,6 @@ RUN uv sync --frozen --package api
 ENV PYTHONUNBUFFERED=1
 EXPOSE 8000
 
-# Course API uses Aurora Data API + boto3 at import; for pure GCP you will point Database at Cloud SQL.
-CMD ["uv", "run", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Cloud Run sets PORT; default 8000 matches Terraform container_port.
+# DB: main.py skips Aurora init when AURORA_* env is missing so the process can listen.
+CMD ["sh", "-c", "exec uv run uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
