@@ -85,6 +85,71 @@ The workflow is **`.github/workflows/deploy-gcp.yml`**. It builds `backend/Docke
 
 `terraform.tfvars` **`github_repo`** must equal this repository as `owner/name` (e.g. `solarinayo/alex`), or the OIDC token from Actions will not match the Workload Identity pool and auth will fail.
 
+#### Step by step: get each value
+
+**Part A — From your computer (Terraform already applied once)**
+
+1. Open Terminal.
+2. Go to the `terraform/gcp` folder inside your Alex project, for example:
+
+   ```bash
+   cd "/Users/solarinayomide/Desktop/all/Andela - Ai Engineering/alex/terraform/gcp"
+   ```
+
+3. If `terraform` is not found, use the full path, for example: `"$HOME/bin/terraform"`.
+
+4. **Secret `WIF_PROVIDER`** — run, then copy the **entire** single line of output (no extra spaces or line breaks):
+
+   ```bash
+   terraform output -raw wif_provider
+   ```
+
+   Expected shape: `projects/NUMBERS/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider`
+
+5. **Secret `GCP_SERVICE_ACCOUNT`** — run, then copy the email:
+
+   ```bash
+   terraform output -raw app_deployer_service_account
+   ```
+
+   Expected shape: `gh-alex-app-deployer@YOUR-PROJECT-ID.iam.gserviceaccount.com`
+
+6. **Variable `NEXT_PUBLIC_API_URL`** — run, then copy the URL (this is the API the browser will call):
+
+   ```bash
+   terraform output -raw backend_service_url
+   ```
+
+   Expected shape: `https://alex-api-??????-ew.a.run.app`
+
+7. **Variable `GCP_PROJECT_ID`** — open your local `terraform/gcp/terraform.tfvars` and copy the value in quotes after `project_id` (e.g. `jekacode-488803`). That file is not committed; it is only on your machine.
+
+**Part B — From Clerk (browser)**
+
+1. Go to [https://dashboard.clerk.com](https://dashboard.clerk.com) and open your app.
+2. **Configure** → **API keys** (wording can vary).
+3. Copy the **Publishable key** (starts with `pk_test_` or `pk_live_`). That is **Secret `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`**.
+
+**Part C — Paste into GitHub**
+
+1. Open: [https://github.com/solarinayo/alex/settings/secrets/actions](https://github.com/solarinayo/alex/settings/secrets/actions) (you must be logged in as a repo **admin**).
+2. **Secrets** tab → **New repository secret** three times:
+
+   | Name | Paste |
+   |------|--------|
+   | `WIF_PROVIDER` | Output of `terraform output -raw wif_provider` |
+   | `GCP_SERVICE_ACCOUNT` | Output of `terraform output -raw app_deployer_service_account` |
+   | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | `pk_...` from Clerk |
+
+3. **Variables** tab (same page) → **New repository variable** twice:
+
+   | Name | Value |
+   |------|--------|
+   | `GCP_PROJECT_ID` | e.g. `jekacode-488803` |
+   | `NEXT_PUBLIC_API_URL` | Output of `terraform output -raw backend_service_url` (full `https://...` URL, no trailing `/`) |
+
+4. **Actions** → **Deploy GCP (Cloud Run)** → open the last run → **Re-run all jobs** (or push a commit to `main`).
+
 ### Run the workflow
 
 - Push to **`main`**, or use **Actions → Deploy GCP (Cloud Run) → Run workflow**.
