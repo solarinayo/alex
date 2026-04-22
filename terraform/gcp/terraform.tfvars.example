@@ -1,0 +1,19 @@
+project_id = "your-gcp-project-id"
+region     = "europe-west1"
+
+# GitHub Actions OIDC: use owner/repo only (e.g. solarinayo/alex). Not a URL, no .git
+github_repo = "your-github-username/your-repo-name"
+
+# openai_api_key: set in the environment (keeps secrets out of files that might be copy-pasted):
+#   export TF_VAR_openai_api_key="sk-..."
+# openai_model   = "gpt-4o-mini"
+clerk_issuer   = "https://YOUR_INSTANCE.clerk.accounts.dev"
+clerk_jwks_url = "https://YOUR_INSTANCE.clerk.accounts.dev/.well-known/jwks.json"
+
+# Optional overrides
+# backend_service_name   = "alex-api"
+# frontend_service_name  = "alex-web"
+# artifact_repository_id = "alex-repo"
+# uploads_bucket_name    = ""
+# db_name                = "alex"
+# db_user                = "alex"

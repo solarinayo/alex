@@ -1,0 +1,92 @@
+# CI: build Docker images, push to Artifact Registry, deploy to Cloud Run.
+# Prereq: Terraform gcp/ applied; GitHub repo matches terraform.tfvars github_repo; secrets/vars set (see terraform/gcp/README.md).
+
+name: Deploy GCP (Cloud Run)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  REGION: europe-west1
+  AR_HOST: europe-west1-docker.pkg.dev
+  # Image names under Artifact Registry repository (default: alex-repo)
+  API_IMAGE_NAME: alex-api
+  WEB_IMAGE_NAME: alex-web
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Auth to Google Cloud (Workload Identity Federation)
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - name: Docker auth (Artifact Registry)
+        run: gcloud auth configure-docker "${{ env.AR_HOST }}" --quiet
+
+      - name: Build and push API image
+        run: |
+          IMAGE="${{ env.AR_HOST }}/${{ vars.GCP_PROJECT_ID }}/alex-repo/${{ env.API_IMAGE_NAME }}:${{ github.sha }}"
+          docker build -f backend/Dockerfile.gcp -t "${IMAGE}" .
+          docker push "${IMAGE}"
+          echo "API_IMAGE=${IMAGE}" >> "$GITHUB_ENV"
+
+      - name: Build and push frontend (static export + nginx)
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+        run: |
+          if [ -z "${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}" ]; then
+            echo "Set repository secret NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY (Clerk dashboard)"
+            exit 1
+          fi
+          if [ -z "${NEXT_PUBLIC_API_URL}" ]; then
+            echo "Set repository variable NEXT_PUBLIC_API_URL to your Cloud Run API URL, e.g. https://alex-api-xxxxx-ew.a.run.app"
+            exit 1
+          fi
+          IMAGE="${{ env.AR_HOST }}/${{ vars.GCP_PROJECT_ID }}/alex-repo/${{ env.WEB_IMAGE_NAME }}:${{ github.sha }}"
+          docker build -f frontend/Dockerfile.gcp \
+            --build-arg "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}" \
+            --build-arg "NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}" \
+            -t "${IMAGE}" \
+            ./frontend
+          docker push "${IMAGE}"
+          echo "WEB_IMAGE=${IMAGE}" >> "$GITHUB_ENV"
+
+      - name: Deploy Cloud Run (API)
+        run: |
+          gcloud run services update alex-api \
+            --image "${API_IMAGE}" \
+            --region "${{ env.REGION }}" \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --quiet
+
+      - name: Deploy Cloud Run (frontend)
+        run: |
+          gcloud run services update alex-web \
+            --image "${WEB_IMAGE}" \
+            --region "${{ env.REGION }}" \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --quiet
+
+      - name: Show URLs
+        run: |
+          gcloud run services describe alex-api --region "${{ env.REGION }}" --project "${{ vars.GCP_PROJECT_ID }}" --format 'value(status.url)'
+          gcloud run services describe alex-web --region "${{ env.REGION }}" --project "${{ vars.GCP_PROJECT_ID }}" --format 'value(status.url)'

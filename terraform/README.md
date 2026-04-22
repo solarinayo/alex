@@ -6,6 +6,7 @@ This directory contains Terraform configurations for the Alex Financial Planner 
 
 Each part of the course has its own independent Terraform directory:
 
+- **`gcp/`** - Optional **GCP** stack (Cloud Run, Cloud SQL, GCS, OpenAI secrets, WIF) in the style of [andela-alex-project](https://github.com/Toluwalemi/andela-alex-project); see `gcp/README.md`. Does not map 1:1 to the AWS guides.
 - **`2_sagemaker/`** - SageMaker serverless endpoint for embeddings (Guide 2)
 - **`3_ingestion/`** - S3 Vectors, Lambda, and API Gateway for document ingestion (Guide 3)
 - **`4_researcher/`** - App Runner service for AI researcher agent (Guide 4)

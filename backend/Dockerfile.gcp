@@ -1,0 +1,19 @@
+# Build from repository root: docker build -f backend/Dockerfile.gcp -t alex-api .
+# Cloud Run + uv workspace (api + database).
+
+FROM python:3.12-slim-bookworm
+WORKDIR /app
+
+RUN pip install --no-cache-dir uv
+
+COPY backend/pyproject.toml backend/uv.lock ./
+COPY backend/api ./api
+COPY backend/database ./database
+
+RUN uv sync --frozen --package api
+
+ENV PYTHONUNBUFFERED=1
+EXPOSE 8000
+
+# Course API uses Aurora Data API + boto3 at import; for pure GCP you will point Database at Cloud SQL.
+CMD ["uv", "run", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
