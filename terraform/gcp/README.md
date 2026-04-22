@@ -90,18 +90,18 @@ The workflow is **`.github/workflows/deploy-gcp.yml`**. It builds `backend/Docke
 **Part A — From your computer (Terraform already applied once)**
 
 1. Open Terminal.
-2. Go to the `terraform/gcp` folder inside your Alex project, for example:
+2. In Terminal, **change directory** to this folder (the words `terraform/gcp` in docs mean “this path”, not something you type as a command):
 
    ```bash
    cd "/Users/solarinayomide/Desktop/all/Andela - Ai Engineering/alex/terraform/gcp"
    ```
 
-3. If `terraform` is not found, use the full path, for example: `"$HOME/bin/terraform"`.
+3. If typing `terraform` says **command not found**, your binary is in `~/bin` from the manual install. Use the **full path** for every Terraform command, for example `"$HOME/bin/terraform"`, or add to `~/.zshrc` once: `export PATH="$HOME/bin:$PATH"` and open a new terminal.
 
-4. **Secret `WIF_PROVIDER`** — run, then copy the **entire** single line of output (no extra spaces or line breaks):
+4. **Secret `WIF_PROVIDER`** — run, then copy the **entire** single line of output (no extra spaces or line breaks). If `terraform` is not on your `PATH`, use the same path you used when `terraform` worked (for example `~/bin/terraform`):
 
    ```bash
-   terraform output -raw wif_provider
+   "$HOME/bin/terraform" output -raw wif_provider
    ```
 
    Expected shape: `projects/NUMBERS/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider`
@@ -109,7 +109,7 @@ The workflow is **`.github/workflows/deploy-gcp.yml`**. It builds `backend/Docke
 5. **Secret `GCP_SERVICE_ACCOUNT`** — run, then copy the email:
 
    ```bash
-   terraform output -raw app_deployer_service_account
+   "$HOME/bin/terraform" output -raw app_deployer_service_account
    ```
 
    Expected shape: `gh-alex-app-deployer@YOUR-PROJECT-ID.iam.gserviceaccount.com`
@@ -117,7 +117,7 @@ The workflow is **`.github/workflows/deploy-gcp.yml`**. It builds `backend/Docke
 6. **Variable `NEXT_PUBLIC_API_URL`** — run, then copy the URL (this is the API the browser will call):
 
    ```bash
-   terraform output -raw backend_service_url
+   "$HOME/bin/terraform" output -raw backend_service_url
    ```
 
    Expected shape: `https://alex-api-??????-ew.a.run.app`
