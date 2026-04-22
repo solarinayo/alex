@@ -47,6 +47,17 @@ jobs:
             exit 1
           fi
 
+      - name: Check required repository variables
+        env:
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+        run: |
+          if [ -z "$GCP_PROJECT_ID" ]; then
+            echo "::error::Missing repository variable GCP_PROJECT_ID (e.g. jekacode-488803)."
+            echo "Add it: Settings → Secrets and variables → Actions → tab Variables → New repository variable"
+            echo "Without it, the Docker image name becomes ...pkg.dev//alex-repo/... and the build fails."
+            exit 1
+          fi
+
       - name: Auth to Google Cloud (Workload Identity Federation)
         id: auth
         uses: google-github-actions/auth@v2
