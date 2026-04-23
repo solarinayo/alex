@@ -29,12 +29,30 @@ logger = logging.getLogger(__name__)
 
 
 def _is_gcp_sql_configured() -> bool:
-    return bool(
-        os.environ.get("INSTANCE_CONNECTION_NAME")
-        and os.environ.get("DB_USER")
+    """
+    True when we can open Postgres for GCP: DB_USER, DB_NAME, DB_PASSWORD, plus either
+    - DB_HOST (+ optional DB_PORT): local dev via Cloud SQL Auth Proxy (TCP), or
+    - INSTANCE_CONNECTION_NAME: Cloud Run socket /cloudsql/PROJ:REGION:INSTANCE
+    """
+    if not (
+        os.environ.get("DB_USER")
         and os.environ.get("DB_NAME")
         and "DB_PASSWORD" in os.environ
-    )
+    ):
+        return False
+    if (os.environ.get("DB_HOST") or "").strip():
+        return True
+    return bool(os.environ.get("INSTANCE_CONNECTION_NAME"))
+
+
+def get_gcp_postgres_connection():
+    """Get a psycopg2 connection for Cloud SQL (proxy TCP or Cloud Run socket)."""
+    if not _is_gcp_sql_configured():
+        raise ValueError(
+            "GCP DB: set DB_USER, DB_NAME, DB_PASSWORD and either "
+            "DB_HOST (local proxy) or INSTANCE_CONNECTION_NAME (Cloud Run / socket)."
+        )
+    return _get_connection()
 
 
 def _sql_data_api_to_psycopg(sql: str) -> str:
@@ -92,7 +110,20 @@ def _data_api_params_to_dict(parameters: Optional[List[Dict]]) -> Optional[Dict[
 def _get_connection():
     if not _is_gcp_sql_configured():
         raise ValueError(
-            "GCP Cloud SQL: set INSTANCE_CONNECTION_NAME, DB_USER, DB_NAME, and DB_PASSWORD."
+            "GCP Cloud SQL: set DB_USER, DB_NAME, DB_PASSWORD, and "
+            "DB_HOST+DB_PORT for local proxy, or INSTANCE_CONNECTION_NAME for /cloudsql socket."
+        )
+    # Local: Cloud SQL Auth Proxy listens on 127.0.0.1:5432 (or DB_PORT) — /cloudsql does not exist on macOS
+    host = (os.environ.get("DB_HOST") or "").strip()
+    if host:
+        port = int(os.environ.get("DB_PORT", "5432"))
+        return psycopg2.connect(
+            host=host,
+            port=port,
+            user=os.environ["DB_USER"],
+            password=os.environ["DB_PASSWORD"],
+            dbname=os.environ["DB_NAME"],
+            sslmode="disable",
         )
     inst = os.environ["INSTANCE_CONNECTION_NAME"]
     return psycopg2.connect(
@@ -129,7 +160,8 @@ class CloudSQLClient:
     def __init__(self) -> None:
         if not _is_gcp_sql_configured():
             raise ValueError(
-                "Cloud SQL: set INSTANCE_CONNECTION_NAME, DB_USER, DB_NAME, and DB_PASSWORD."
+                "Cloud SQL: set DB_USER, DB_NAME, DB_PASSWORD and either "
+                "DB_HOST (proxy) or INSTANCE_CONNECTION_NAME (socket on Cloud Run)."
             )
         self.database = os.environ.get("DB_NAME", "alex")
 

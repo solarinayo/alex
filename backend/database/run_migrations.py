@@ -17,26 +17,25 @@ for _env in (_base / ".env", _base.parent / ".env", _base.parent.parent / ".env"
     if _env.is_file():
         load_dotenv(_env, override=True)
 
+# After .env, import GCP client (DB_HOST vs INSTANCE_CONNECTION_NAME is resolved there)
+from src.gcp_client import _is_gcp_sql_configured, get_gcp_postgres_connection
+
 # Get config from environment
 cluster_arn = os.environ.get("AURORA_CLUSTER_ARN")
 secret_arn = os.environ.get("AURORA_SECRET_ARN")
 database = os.environ.get("AURORA_DATABASE", "alex")
 region = os.environ.get("DEFAULT_AWS_REGION", "us-east-1")
 
-# GCP / Cloud SQL (Tolu-style): use Unix socket when INSTANCE_CONNECTION_NAME and DB_* are set
-GCP_CSQL = bool(
-    os.environ.get("INSTANCE_CONNECTION_NAME")
-    and os.environ.get("DB_USER")
-    and os.environ.get("DB_NAME")
-    and "DB_PASSWORD" in os.environ
-)
+# GCP: DB_* + (DB_HOST for local proxy) OR (INSTANCE_CONNECTION_NAME for Cloud Run socket)
+GCP_CSQL = _is_gcp_sql_configured()
 
 if not GCP_CSQL and (not cluster_arn or not secret_arn):
     raise ValueError(
         "Add database env to a .env at project root, backend/.env, or backend/database/.env, then retry.\n"
         "  AWS: AURORA_CLUSTER_ARN, AURORA_SECRET_ARN (and optional AURORA_DATABASE).\n"
-        "  GCP: INSTANCE_CONNECTION_NAME, DB_USER, DB_NAME, DB_PASSWORD (from terraform output / Cloud Run).\n"
-        "  Copy from the repo’s .env.example. For local GCP, run Cloud SQL Auth Proxy so /cloudsql/... exists."
+        "  GCP on Cloud Run: INSTANCE_CONNECTION_NAME, DB_USER, DB_NAME, DB_PASSWORD (socket at /cloudsql/...).\n"
+        "  GCP on your Mac: same DB_*, plus DB_HOST=127.0.0.1 DB_PORT=5432, and start Cloud SQL Auth Proxy.\n"
+        "  See terraform/gcp/README.md (migrations on laptop)."
     )
 
 if not GCP_CSQL:
@@ -164,13 +163,7 @@ for i, stmt in enumerate(statements, 1):
 
     try:
         if GCP_CSQL:
-            inst = os.environ["INSTANCE_CONNECTION_NAME"]
-            with psycopg2.connect(
-                host=f"/cloudsql/{inst}",
-                user=os.environ["DB_USER"],
-                password=os.environ["DB_PASSWORD"],
-                dbname=os.environ["DB_NAME"],
-            ) as conn:
+            with get_gcp_postgres_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute(stmt)
             print(f"    ✅ Success")
