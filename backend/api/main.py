@@ -6,6 +6,7 @@ Handles all API routes with Clerk JWT authentication
 import os
 import json
 import logging
+from pathlib import Path
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from decimal import Decimal
@@ -29,8 +30,14 @@ from src.schemas import (
     JobType, JobStatus
 )
 
-# Load environment variables
-load_dotenv(override=True)
+# Load .env: api dir, backend dir, or project root (so `uv run main.py` from backend/api still finds root .env)
+for _env in (
+    Path(__file__).resolve().parent / ".env",
+    Path(__file__).resolve().parent.parent / ".env",
+    Path(__file__).resolve().parent.parent.parent / ".env",
+):
+    if _env.is_file():
+        load_dotenv(_env, override=True)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
