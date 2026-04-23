@@ -1,0 +1,95 @@
+# Surfaces the course guides and Terraform layout in the GitHub Actions UI
+# (Job summary at the top of the workflow run — open a run to see the index).
+name: Guides & Terraform index
+
+on:
+  push:
+    paths:
+      - "guides/**"
+      - ".github/workflows/guides.yml"
+    branches: [main]
+  pull_request:
+    paths:
+      - "guides/**"
+      - ".github/workflows/guides.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: guides-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  index:
+    name: List guides & stack map
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Write guide index to Actions summary
+        env:
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          BLOB_BASE="https://github.com/${REPO}/blob/${SHA}"
+          {
+            echo "## Alex — course guides"
+            echo "Pin: [\`${SHA:0:7}\`](${BLOB_BASE}) on branch \`${{ github.ref_name }}\`."
+            echo ""
+            echo "| Guide / doc | Open in repo |"
+            echo "|---|---|"
+            for f in \
+              guides/1_permissions.md \
+              guides/2_sagemaker.md \
+              guides/3_ingest.md \
+              guides/4_researcher.md \
+              guides/5_database.md \
+              guides/6_agents.md \
+              guides/7_frontend.md \
+              guides/8_enterprise.md \
+              guides/architecture.md \
+              guides/agent_architecture.md \
+              guides/terraform_interaction.md; do
+              if [ -f "$f" ]; then
+                echo "| \`$f\` | [view](${BLOB_BASE}/${f}) |"
+              fi
+            done
+            for f in guides/*.md; do
+              case "$f" in
+                guides/1_permissions.md|guides/2_sagemaker.md|guides/3_ingest.md|guides/4_researcher.md|guides/5_database.md|guides/6_agents.md|guides/7_frontend.md|guides/8_enterprise.md|guides/architecture.md|guides/agent_architecture.md|guides/terraform_interaction.md) continue ;;
+              esac
+              if [ -f "$f" ]; then
+                echo "| \`$f\` | [view](${BLOB_BASE}/${f}) |"
+              fi
+            done
+            echo ""
+            echo "### How Terraform “communicates” in the AWS course"
+            echo "Independent roots under \`terraform/\` share **no** remote state; hand **outputs → tfvars** between guides. Details: [terraform_interaction.md](${BLOB_BASE}/guides/terraform_interaction.md)"
+            echo ""
+            echo "| AWS course stack | Terraform folder |"
+            echo "|---|---|"
+            shopt -s nullglob
+            for d in terraform/[2-8]_*/; do
+              d="${d%/}"
+              if [ -d "$d" ]; then
+                short=$(basename "$d")
+                echo "| \`${short}\` | [open](${BLOB_BASE}/${d}) |"
+              fi
+            done
+            shopt -u nullglob
+            echo ""
+            if [ -f terraform/gcp/main.tf ]; then
+              echo "### GCP track"
+              echo "| Path | |"
+              echo "|---|---|"
+              echo "| \`terraform/gcp/\` | [open](${BLOB_BASE}/terraform/gcp) |"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Count guide files
+        run: |
+          echo "guides/*.md count: $(ls -1 guides/*.md 2>/dev/null | wc -l | tr -d ' ')"
