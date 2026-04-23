@@ -57,7 +57,7 @@ After apply, push real container images to Artifact Registry and deploy to the e
 
 - Terraform sets **`INSTANCE_CONNECTION_NAME`**, **`DB_NAME`**, **`DB_USER`**, and **`DB_PASSWORD`** on the `alex-api` service (see `cloud_run.tf`). The backend’s `alex-database` package now uses a **Postgres (psycopg2) client** for that path; you do **not** need `AURORA_*` for GCP.
 - **First-time schema:** run the migration SQL against Cloud SQL, for example:
-  - Install [Cloud SQL Auth Proxy](https://cloud.google.com/sql/docs/postgres/sql-proxy) locally, set the same `DB_*` and `INSTANCE_CONNECTION_NAME`, then from `backend/database` run: `uv run run_migrations.py`, or
+  - Install [Cloud SQL Auth Proxy](https://cloud.google.com/sql/docs/postgres/sql-proxy) locally, set the same `DB_*` and `INSTANCE_CONNECTION_NAME`, then **from the repo** run: `cd backend/database` and `uv run run_migrations.py` (if you run this from `terraform/` you will get “No such file or directory” because the script is not there), or
   - Run a one-off Cloud Run job that executes `uv run run_migrations.py` with a VPC/connector that can reach the instance, or
   - Connect with `gcloud sql connect` and run `migrations/001_schema.sql` (if you use that file instead of the built-in statements in `run_migrations.py`).
 
