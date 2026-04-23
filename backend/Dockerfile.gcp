@@ -16,5 +16,5 @@ ENV PYTHONUNBUFFERED=1
 EXPOSE 8000
 
 # Cloud Run sets PORT; default 8000 matches Terraform container_port.
-# DB: main.py skips Aurora init when AURORA_* env is missing so the process can listen.
+# DB: On GCP, Cloud Run sets INSTANCE_CONNECTION_NAME, DB_*, and DB_PASSWORD; alex-database uses Cloud SQL (psycopg2).
 CMD ["sh", "-c", "exec uv run uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

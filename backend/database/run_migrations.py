@@ -5,7 +5,7 @@ Simple migration runner that executes statements one by one
 
 import os
 import boto3
-from pathlib import Path
+import psycopg2
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 
@@ -18,10 +18,24 @@ secret_arn = os.environ.get("AURORA_SECRET_ARN")
 database = os.environ.get("AURORA_DATABASE", "alex")
 region = os.environ.get("DEFAULT_AWS_REGION", "us-east-1")
 
-if not cluster_arn or not secret_arn:
-    raise ValueError("Missing AURORA_CLUSTER_ARN or AURORA_SECRET_ARN in environment variables")
+# GCP / Cloud SQL (Tolu-style): use Unix socket when INSTANCE_CONNECTION_NAME and DB_* are set
+GCP_CSQL = bool(
+    os.environ.get("INSTANCE_CONNECTION_NAME")
+    and os.environ.get("DB_USER")
+    and os.environ.get("DB_NAME")
+    and "DB_PASSWORD" in os.environ
+)
 
-client = boto3.client("rds-data", region_name=region)
+if not GCP_CSQL and (not cluster_arn or not secret_arn):
+    raise ValueError(
+        "Set either (AURORA_CLUSTER_ARN + AURORA_SECRET_ARN) for AWS, or "
+        "(INSTANCE_CONNECTION_NAME, DB_USER, DB_NAME, DB_PASSWORD) for Cloud SQL on GCP"
+    )
+
+if not GCP_CSQL:
+    client = boto3.client("rds-data", region_name=region)
+else:
+    client = None
 
 # Read migration file
 with open("migrations/001_schema.sql") as f:
@@ -142,19 +156,35 @@ for i, stmt in enumerate(statements, 1):
     print(f"    {first_line}...")
 
     try:
-        response = client.execute_statement(
-            resourceArn=cluster_arn, secretArn=secret_arn, database=database, sql=stmt
-        )
-        print(f"    ✅ Success")
-        success_count += 1
+        if GCP_CSQL:
+            inst = os.environ["INSTANCE_CONNECTION_NAME"]
+            with psycopg2.connect(
+                host=f"/cloudsql/{inst}",
+                user=os.environ["DB_USER"],
+                password=os.environ["DB_PASSWORD"],
+                dbname=os.environ["DB_NAME"],
+            ) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(stmt)
+            print(f"    ✅ Success")
+            success_count += 1
+        else:
+            response = client.execute_statement(
+                resourceArn=cluster_arn, secretArn=secret_arn, database=database, sql=stmt
+            )
+            print(f"    ✅ Success")
+            success_count += 1
 
-    except ClientError as e:
-        error_msg = e.response["Error"]["Message"]
-        if "already exists" in error_msg.lower():
+    except (ClientError, Exception) as e:
+        if GCP_CSQL:
+            error_msg = str(e)
+        else:
+            error_msg = e.response["Error"]["Message"] if isinstance(e, ClientError) else str(e)
+        if "already exists" in error_msg.lower() or "duplicate" in error_msg.lower():
             print(f"    ⚠️  Already exists (skipping)")
             success_count += 1
         else:
-            print(f"    ❌ Error: {error_msg[:100]}")
+            print(f"    ❌ Error: {error_msg[:200]}")
             error_count += 1
 
 print("\n" + "=" * 50)

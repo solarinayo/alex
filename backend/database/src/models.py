@@ -2,14 +2,20 @@
 Database models and query builders
 """
 
-from typing import Dict, List, Optional, Any
+import os
+from typing import Dict, List, Optional, Any, Union
 from datetime import datetime, date
 from decimal import Decimal
 from .client import DataAPIClient
+from .gcp_client import CloudSQLClient, _is_gcp_sql_configured
 from .schemas import (
     InstrumentCreate, UserCreate, AccountCreate, 
     PositionCreate, JobCreate, JobUpdate
 )
+
+
+# Shared DB client type: Aurora Data API or Cloud SQL
+DbClient = Union[DataAPIClient, CloudSQLClient]
 
 
 class BaseModel:
@@ -17,7 +23,7 @@ class BaseModel:
     
     table_name = None
     
-    def __init__(self, db: DataAPIClient):
+    def __init__(self, db: DbClient):
         self.db = db
         if not self.table_name:
             raise ValueError("table_name must be defined")
@@ -296,13 +302,25 @@ class Jobs(BaseModel):
         return self.db.query(sql, params)
 
 
+def _make_client(cluster_arn, secret_arn, database, region):
+    """Aurora (AURORA_*) or Cloud SQL (INSTANCE_CONNECTION_NAME, DB_*) for GCP / Tolu-style."""
+    if _is_gcp_sql_configured():
+        return CloudSQLClient()
+    if os.environ.get("AURORA_CLUSTER_ARN") and os.environ.get("AURORA_SECRET_ARN"):
+        return DataAPIClient(cluster_arn, secret_arn, database, region)
+    raise ValueError(
+        "No database config: set either Aurora (AURORA_CLUSTER_ARN, AURORA_SECRET_ARN) "
+        "or GCP Cloud SQL (INSTANCE_CONNECTION_NAME, DB_USER, DB_NAME, DB_PASSWORD)."
+    )
+
+
 class Database:
     """Main database interface providing access to all models"""
-    
+
     def __init__(self, cluster_arn: str = None, secret_arn: str = None,
                  database: str = None, region: str = None):
         """Initialize database with all model classes"""
-        self.client = DataAPIClient(cluster_arn, secret_arn, database, region)
+        self.client = _make_client(cluster_arn, secret_arn, database, region)
         
         # Initialize all models
         self.users = Users(self.client)

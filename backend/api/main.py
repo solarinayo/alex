@@ -91,14 +91,14 @@ async def general_exception_handler(request: Request, exc: Exception):
         content={"detail": "An unexpected error occurred. Our team has been notified."}
     )
 
-# Initialize services — on GCP Cloud Run, AURORA_* is absent until you wire Cloud SQL; do not block startup
+# Database: either Aurora (AURORA_*) or GCP Cloud SQL (INSTANCE_CONNECTION_NAME, DB_*) from terraform/gcp
 db: Optional[Database] = None
 try:
     db = Database()
 except Exception as e:
     logger.warning(
-        "Database not initialized (Aurora Data API / AURORA_* not configured; "
-        "expected on Cloud Run until Cloud SQL is wired). Health still works. Error: %s",
+        "Database not initialized (set Aurora AURORA_* or GCP Cloud SQL env from terraform/gcp). "
+        "Health may still work. Error: %s",
         e,
     )
 
