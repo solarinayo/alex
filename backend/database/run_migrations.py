@@ -6,11 +6,16 @@ Simple migration runner that executes statements one by one
 import os
 import boto3
 import psycopg2
+from pathlib import Path
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv(override=True)
+# Load .env from this package dir, then backend/, then project root (so
+# `uv run` from backend/database still picks up the root .env you already use for GCP/AWS).
+_base = Path(__file__).resolve().parent
+for _env in (_base / ".env", _base.parent / ".env", _base.parent.parent / ".env"):
+    if _env.is_file():
+        load_dotenv(_env, override=True)
 
 # Get config from environment
 cluster_arn = os.environ.get("AURORA_CLUSTER_ARN")
@@ -28,8 +33,10 @@ GCP_CSQL = bool(
 
 if not GCP_CSQL and (not cluster_arn or not secret_arn):
     raise ValueError(
-        "Set either (AURORA_CLUSTER_ARN + AURORA_SECRET_ARN) for AWS, or "
-        "(INSTANCE_CONNECTION_NAME, DB_USER, DB_NAME, DB_PASSWORD) for Cloud SQL on GCP"
+        "Add database env to a .env at project root, backend/.env, or backend/database/.env, then retry.\n"
+        "  AWS: AURORA_CLUSTER_ARN, AURORA_SECRET_ARN (and optional AURORA_DATABASE).\n"
+        "  GCP: INSTANCE_CONNECTION_NAME, DB_USER, DB_NAME, DB_PASSWORD (from terraform output / Cloud Run).\n"
+        "  Copy from the repo’s .env.example. For local GCP, run Cloud SQL Auth Proxy so /cloudsql/... exists."
     )
 
 if not GCP_CSQL:
