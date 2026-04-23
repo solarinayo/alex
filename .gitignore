@@ -231,3 +231,6 @@ backend/**/*_lambda.zip
 # But do include the scheduler
 !backend/scheduler/lambda_function.zip
 !frontend/lib
+
+# Local Cloud SQL Auth Proxy binary (often placed in a project dir; do not commit)
+cloud-sql-proxy

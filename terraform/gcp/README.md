@@ -58,7 +58,8 @@ After apply, push real container images to Artifact Registry and deploy to the e
 - Terraform sets **`INSTANCE_CONNECTION_NAME`**, **`DB_NAME`**, **`DB_USER`**, and **`DB_PASSWORD`** on the `alex-api` service (see `cloud_run.tf`). The backend’s `alex-database` package now uses a **Postgres (psycopg2) client** for that path; you do **not** need `AURORA_*` for GCP.
 - **First-time schema (from your Mac):** `/cloudsql/...` does **not** exist on a laptop. Use the **Auth Proxy** and **TCP**:
   1. [Install the Cloud SQL Auth Proxy](https://cloud.google.com/sql/docs/postgres/sql-proxy) and log in: `gcloud auth application-default login` (if needed).
-  2. **Terminal 1** (leave running): `cloud-sql-proxy jekacode-488803:europe-west1:alex-postgres --port 5432` (replace with your instance connection name from the SQL instance page).
+  2. **Terminal 1** (leave running): if you [downloaded the binary](https://cloud.google.com/sql/docs/postgres/sql-proxy#install) into the current directory, you must use **`./cloud-sql-proxy`** (current folder is not on `PATH`). Example:  
+     `./cloud-sql-proxy jekacode-488803:europe-west1:alex-postgres --port 5432` (replace with your instance connection name), or use `brew install cloud-sql-proxy` and then `cloud-sql-proxy` from anywhere.
   3. In **`.env`**: `DB_HOST=127.0.0.1`, `DB_PORT=5432`, and the same `DB_NAME`, `DB_USER`, `DB_PASSWORD` you use in Cloud SQL (or from Secret Manager). You can **omit** `INSTANCE_CONNECTION_NAME` for local; it is only required for the app on **Cloud Run** (socket).  
   4. **Terminal 2:** `cd backend/database` and `uv run run_migrations.py` (do not run this from `terraform/` — the script is under `backend/database`).
 
