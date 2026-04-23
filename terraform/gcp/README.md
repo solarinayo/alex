@@ -4,6 +4,8 @@ This directory mirrors the layout used in [Toluwalemi/andela-alex-project](https
 
 It does **not** replace the course’s AWS modules (`2_sagemaker` … `8_enterprise`). Those stay for the Udemy path. Use this folder when you want GCP instead.
 
+**End-to-end diagram** (Terraform vs GitHub Actions vs browser): [APP_AND_CI_FLOW.md](APP_AND_CI_FLOW.md) — *what you apply once, what runs on every `main` push, and the request path.*
+
 ## Prerequisites
 
 - A GCP project with billing enabled
